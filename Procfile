@@ -1,1 +1,1 @@
-web: python bot_wikidata.py
+wikidata: python bot_wikidata.py
