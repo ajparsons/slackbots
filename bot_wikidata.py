@@ -10,6 +10,7 @@ import requests
 import json
 import string
 import sys
+import calendar
 import time
 from slackclient import SlackClient
 
@@ -23,8 +24,10 @@ if slack_bot_token == None:
 slack_client = SlackClient(slack_bot_token)
 # starterbot's user ID in Slack: value is assigned after the bot starts up
 starterbot_id = None
+previous_store = {}
 
 # constants
+NO_REPEAT = 120 # will not repeat same help
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
 def no_pun(v):
     """
@@ -80,6 +83,27 @@ def make_message(groups,message):
             lines.append(line)
     return "\n\r".join(lines)
     
+def remove_recent(matches,timestamp):
+    """
+    has a cool down before it repeats what a property was
+    """
+    global previous_store
+    now = calendar.timegm(time.gmtime())
+    final = []
+    for m in matches:
+        previous = previous_store.get(m,None)
+        if previous:
+            distance = now - previous
+            if distance > NO_REPEAT:
+                final.append(m)
+        else:
+            final.append(m)
+            
+    for f in final:
+        previous_store[f] = timestamp
+        
+    return final
+        
 
 def parse_bot_commands(slack_events):
     """
@@ -90,10 +114,11 @@ def parse_bot_commands(slack_events):
     for event in slack_events:
         if event["type"] == "message" and not "subtype" in event:
             matches = get_wikidata_items(event["text"])
+            matches = remove_recent(matches,float(event["ts"]))
             #print matches
             if matches:
                 message = make_message(matches,event["text"])
-                return message, event["channel"]
+                return message, event
             #if user_id == starterbot_id:
             #    return message, event["channel"]
     return None, None
@@ -101,34 +126,46 @@ def parse_bot_commands(slack_events):
 def get_wikidata_items(message_text):
     """
     returns any Q or P items mentioned in a message
+    if this is inside a URL, is ignored
     """
     MENTION_REGEX = "([QPqp]\d+)"
     
+    URL_REGEX = "(http|ftp|https)://([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?"
+    
+    urls = ["".join(x) for x in re.findall(URL_REGEX, message_text)]
+    all_urls = "".join(urls)
+    
     matches = re.findall(MENTION_REGEX, message_text)
     # the first group contains the username, the second group contains the remaining message
+    matches = [x for x in matches if x not in all_urls and x.lower() <> "p0"]
     
     if matches:
         return matches
     else:
         return []
 
-def handle_command(command, channel):
+def handle_command(command, event):
     """
     sends message to channel
     """
     # Finds and executes the given command, filling in response
     response = command
+    position_args = {"channel":event["channel"]}
+    
+    if "thread_ts" in event:
+        position_args["thread_ts"] = event["thread_ts"]
+    #else:
+    #    position_args["thread_ts"] = event["ts"] #force it reply threaded
 
     # Sends the response back to the channel
     slack_client.api_call(
         "chat.postMessage",
-        channel=channel,
-        text=response
-    )
+        text=response,
+        **position_args)
     
 def bot_loop():
     if slack_client.rtm_connect():
-        print("Starter Bot connected and running!")
+        print("Wikidata bot connected and running!")
         # Read bot's user ID by calling Web API method `auth.test`
         starterbot_id = slack_client.api_call("auth.test")["user_id"]
         while True:
