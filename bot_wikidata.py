@@ -58,8 +58,11 @@ def make_message(groups,message):
     lines = []
     q_url_format = "<https://www.wikidata.org/wiki/{0}|{0}>"
     p_url_format = "<https://www.wikidata.org/wiki/Property:{0}|{0}>"
+    
+    unique = []
+    [unique.append(item) for item in groups if item not in unique]
     print groups
-    for g in groups:
+    for g in unique:
         g = g.upper()
         try:
             label = get_entry(g)
