@@ -1,7 +1,8 @@
 '''
-Created on 25 Jan 2018
+#wikidatahelper slackbot
 
-@author: Alex
+When people say a wikidata ID but don't explain it, this bot will!
+
 '''
 import re
 import os
@@ -12,7 +13,7 @@ import sys
 import time
 from slackclient import SlackClient
 
-# instantiate Slack client
+# key in enviromental variable
 slack_bot_token = os.environ.get("BOT_WIKIDATA",None)
 
 if slack_bot_token == None:
@@ -25,16 +26,21 @@ starterbot_id = None
 
 # constants
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
-EXAMPLE_COMMAND = "do"
-
 def no_pun(v):
+    """
+    removes puntuation
+    """
     exclude = set(string.punctuation)
     s = ''.join(ch for ch in v if ch not in exclude)
     return s
 
 def get_entry(q):
+    """
+    get label for entry via wikidata api
+    """
     q = q.upper()
-    url = "https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=labels&ids={0}".format(q)
+    url_format = "https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=labels&ids={0}"
+    url = url_format.format(q)
     content = requests.get(url).content
     j = json.loads(content)["entities"]
     if q in j:
@@ -44,6 +50,10 @@ def get_entry(q):
     return None
 
 def make_message(groups,message):
+    """
+    creates an explantory label for an item IF part of the label isn't already included
+    in the next
+    """
     words = set(no_pun(message.lower()).split(" "))
     lines = []
     q_url_format = "<https://www.wikidata.org/wiki/{0}|{0}>"
@@ -62,6 +72,7 @@ def make_message(groups,message):
         else:
             url_formatted = q_url_format.format(g)
         line = u"{0}: {1}".format(url_formatted,label)
+        #if none of the words have been used
         if len(label_bits.intersection(words)) == 0:
             lines.append(line)
     return "\n\r".join(lines)
@@ -85,7 +96,9 @@ def parse_bot_commands(slack_events):
     return None, None
 
 def get_wikidata_items(message_text):
-
+    """
+    returns any Q or P items mentioned in a message
+    """
     MENTION_REGEX = "([QPqp]\d+)"
     
     matches = re.findall(MENTION_REGEX, message_text)
@@ -98,9 +111,8 @@ def get_wikidata_items(message_text):
 
 def handle_command(command, channel):
     """
-        Executes bot command if the command is known
+    sends message to channel
     """
-
     # Finds and executes the given command, filling in response
     response = command
 
@@ -125,6 +137,4 @@ def bot_loop():
         print("Connection failed. Exception traceback printed above.")
     
 if __name__ == "__main__":
-    #print get_wikidata_items("This is a test of a message mention a Q10769147 or a P101 that also contains qwords and persons.")
     bot_loop()
-    #print get_entry("Q10769147")
