@@ -128,7 +128,7 @@ def get_wikidata_items(message_text):
     returns any Q or P items mentioned in a message
     if this is inside a URL, is ignored
     """
-    MENTION_REGEX = "([QPqp]\d+)"
+    MENTION_REGEX = "\\b([QPqp]\d+)"
     
     URL_REGEX = "(http|ftp|https)://([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?"
     
